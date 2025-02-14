@@ -45,6 +45,9 @@ export class User {
   })
   updatedAt: Date;
 
+  @Column({ type: 'varchar', nullable: true, default: null })
+  profileImage: string | null;
+
   @ManyToOne(() => Product, (product) => product.user)
   products: Product[];
 

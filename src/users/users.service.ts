@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -12,6 +13,8 @@ import { LoginDto } from './dtos/login.dto';
 import { RegisterDto } from './dtos/register.dto';
 import { UpdateUserDto } from './dtos/update-user.dto';
 import { User } from './user.entity';
+import { join } from 'node:path';
+import { unlinkSync } from 'node:fs';
 
 @Injectable()
 export class UsersService {
@@ -101,5 +104,38 @@ export class UsersService {
     throw new ForbiddenException(
       'Access denied, You are not allowed to implement this action',
     );
+  }
+
+  /**
+   * Set Profile image
+   * @param userId id of the logged in user
+   * @param newProfileImage profile image
+   * @returns the user from the db
+   */
+  public async setProfileImage(userId: number, newProfileImage: string) {
+    const user = await this.getCurrentUser(userId);
+    if (!user.profileImage) {
+      user.profileImage = newProfileImage;
+    } else {
+      await this.removeProfileImage(userId);
+      user.profileImage = newProfileImage;
+    }
+    return this.usersRepository.save(user);
+  }
+
+  /**
+   * Remove profile image
+   * @param userId id od the logged in user
+   * @returns the user from the db without profile image
+   */
+  public async removeProfileImage(userId: number) {
+    const user = await this.getCurrentUser(userId);
+    if (!user.profileImage) {
+      throw new BadRequestException('There is not profile image');
+    }
+    const imagePath = join(process.cwd(), `images/users/${user.profileImage}`);
+    unlinkSync(imagePath);
+    user.profileImage = null;
+    return this.usersRepository.save(user);
   }
 }
