@@ -10,6 +10,7 @@ import { MailService } from './../mail/mail.service';
 import { LoginDto } from './dtos/login.dto';
 import { RegisterDto } from './dtos/register.dto';
 import { User } from './user.entity';
+import { ResetPasswordDto } from './dtos/reset-password.dto';
 
 @Injectable()
 export class AuthProvider {
@@ -100,6 +101,78 @@ export class AuthProvider {
     };
     const accessToken = await this.generateJWT(payload);
     return { email: user.email, username: user.username, accessToken };
+  }
+
+  /**
+   * Sending reset password link to the client
+   */
+  public async sendResetPasswordLink(email: string) {
+    const user = await this.usersRepository.findOne({ where: { email } });
+    if (!user) {
+      throw new BadRequestException('User with given email does not exist!');
+    }
+
+    user.resetPasswordToken = randomBytes(32).toString('hex');
+    const result = await this.usersRepository.save(user);
+
+    const resetPasswordLink = `${this.config.get<string>('CLIENT_DOMAIN')}/reset-password/${user.id}/${result.resetPasswordToken}`;
+
+    await this.mailService.sendResetPasswordTemplate(email, resetPasswordLink);
+
+    return {
+      message:
+        'Password reset link has been sent to your email, please check your inbox',
+    };
+  }
+
+  /**
+   * Get reset password link
+   */
+  public async getResetPasswordLink(
+    userId: number,
+    resetPasswordToken: string,
+  ) {
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+
+    if (!user) {
+      throw new BadRequestException('Invalid link');
+    }
+
+    if (
+      user.resetPasswordToken === null ||
+      user.resetPasswordToken !== resetPasswordToken
+    ) {
+      throw new BadRequestException('Invalid link');
+    }
+
+    return { message: 'valid link' };
+  }
+
+  /**
+   * Reset the password
+   */
+  public async resetPassword(dto: ResetPasswordDto) {
+    const { userId, resetPasswordToken, newPassword } = dto;
+
+    const user = await this.usersRepository.findOne({ where: { id: userId } });
+
+    if (!user) {
+      throw new BadRequestException('Invalid link');
+    }
+
+    if (
+      user.resetPasswordToken === null ||
+      user.resetPasswordToken !== resetPasswordToken
+    ) {
+      throw new BadRequestException('Invalid link');
+    }
+
+    const hashedPassword = await this.hashPassword(newPassword);
+    user.password = hashedPassword;
+    user.resetPasswordToken = null;
+    await this.usersRepository.save(user);
+
+    return { message: 'Password reset successfully, please log in' };
   }
 
   /**

@@ -27,6 +27,8 @@ import { UpdateUserDto } from './dtos/update-user.dto';
 import { AuthRoleGuard } from './guards/auth-roles.guard';
 import { AuthGuard } from './guards/auth.guard';
 import { UsersService } from './users.service';
+import { ForgotPasswordDto } from './dtos/forgot-password.dto';
+import { ResetPasswordDto } from './dtos/reset-password.dto';
 
 @Controller('api')
 export class UsersController {
@@ -108,5 +110,24 @@ export class UsersController {
     @Param('verificationToken') verificationToken: string,
   ) {
     return this.usersService.verifyEmail(id, verificationToken);
+  }
+
+  @Post('users/forgot-password')
+  @HttpCode(HttpStatus.OK)
+  public forgotPassword(@Body() body: ForgotPasswordDto) {
+    return this.usersService.sendResetPassword(body.email);
+  }
+
+  @Get('users/reset-password/:id/:resetPasswordToken')
+  public getResetPassword(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('resetPasswordToken') resetPasswordToken: string,
+  ) {
+    return this.usersService.getResetPassword(id, resetPasswordToken);
+  }
+
+  @Post('users/reset-password')
+  public resetPassword(@Body() body: ResetPasswordDto) {
+    return this.usersService.resetPassword(body);
   }
 }

@@ -15,6 +15,7 @@ import { LoginDto } from './dtos/login.dto';
 import { RegisterDto } from './dtos/register.dto';
 import { UpdateUserDto } from './dtos/update-user.dto';
 import { User } from './user.entity';
+import { ResetPasswordDto } from './dtos/reset-password.dto';
 
 @Injectable()
 export class UsersService {
@@ -161,5 +162,33 @@ export class UsersService {
     return {
       message: 'Your email has been verified, please log in to your account',
     };
+  }
+
+  /**
+   * Sending reset password template
+   * @param email email of the user
+   * @returns a success message
+   */
+  public sendResetPassword(email: string) {
+    return this.authProvider.sendResetPasswordLink(email);
+  }
+
+  /**
+   * Get reset password link
+   * @param userId user id from the link
+   * @param resetPasswordToken reset password token from the link
+   * @returns a success message
+   */
+  public getResetPassword(userId: number, resetPasswordToken: string) {
+    return this.authProvider.getResetPasswordLink(userId, resetPasswordToken);
+  }
+
+  /**
+   * Reset the password
+   * @param dto data for reset the password
+   * @returns a success message
+   */
+  public resetPassword(dto: ResetPasswordDto) {
+    return this.authProvider.resetPassword(dto);
   }
 }
