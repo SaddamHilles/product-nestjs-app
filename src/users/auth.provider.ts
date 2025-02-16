@@ -1,19 +1,22 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { RegisterDto } from './dtos/register.dto';
-import { AccessTokenType, JWTPayloadType } from 'src/utils/types';
-import * as bcrypt from 'bcryptjs';
-import { User } from './user.entity';
-import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
+import * as bcrypt from 'bcryptjs';
+import { randomBytes } from 'node:crypto';
+import { JWTPayloadType } from 'src/utils/types';
 import { Repository } from 'typeorm';
+import { MailService } from './../mail/mail.service';
 import { LoginDto } from './dtos/login.dto';
+import { RegisterDto } from './dtos/register.dto';
+import { User } from './user.entity';
 
 @Injectable()
 export class AuthProvider {
   constructor(
     @InjectRepository(User) private readonly usersRepository: Repository<User>,
     private readonly jwtService: JwtService,
+    private readonly mailService: MailService,
     private readonly config: ConfigService,
   ) {}
 
@@ -22,7 +25,7 @@ export class AuthProvider {
    * @param registerDto data for creating new user
    * @returns JWT (access token)
    */
-  public async register(registerDto: RegisterDto): Promise<AccessTokenType> {
+  public async register(registerDto: RegisterDto) {
     const { email, password, username } = registerDto;
     const userFromDb = await this.usersRepository.findOne({ where: { email } });
 
@@ -36,17 +39,23 @@ export class AuthProvider {
       email,
       username,
       password: hashedPassword,
+      verificationToken: randomBytes(32).toString('hex'),
     });
 
     newUser = await this.usersRepository.save(newUser);
-    // @TODO -> generate JWT Token
+    const link = this.generateLink(newUser.id, newUser.verificationToken);
 
-    const payload: JWTPayloadType = {
-      id: newUser.id,
-      userType: newUser.userType,
+    await this.mailService.sendVerifyEmailTemplate(email, link);
+
+    // const payload: JWTPayloadType = {
+    //   id: newUser.id,
+    //   userType: newUser.userType,
+    // };
+    // const accessToken = await this.generateJWT(payload);
+    return {
+      message:
+        'Verification token has been sent to your email, please verify your email account',
     };
-    const accessToken = await this.generateJWT(payload);
-    return { email: newUser.email, username: newUser.username, accessToken };
   }
 
   /**
@@ -54,7 +63,7 @@ export class AuthProvider {
    * @param loginDto  data for login to user account
    * @returns JWT (access token)
    */
-  public async login(loginDto: LoginDto): Promise<AccessTokenType> {
+  public async login(loginDto: LoginDto) {
     const { email, password } = loginDto;
 
     const user = await this.usersRepository.findOne({ where: { email } });
@@ -67,14 +76,29 @@ export class AuthProvider {
       throw new BadRequestException('Invalid email or password');
     }
 
-    // @TODO -> generate JWT Token
+    if (!user.isAccountVerified) {
+      let verificationToken = user.verificationToken;
+      console.log('verificationToken: ', verificationToken);
+
+      if (!verificationToken) {
+        verificationToken = randomBytes(32).toString('hex');
+        user.verificationToken = verificationToken; // Assign it to the user
+        await this.usersRepository.save(user); // Save the updated user
+      }
+
+      const link = this.generateLink(user.id, verificationToken);
+      await this.mailService.sendVerifyEmailTemplate(email, link);
+      return {
+        message:
+          'Verification token has been sent to your email, please verify your email account',
+      };
+    }
 
     const payload: JWTPayloadType = {
       id: user.id,
       userType: user.userType,
     };
     const accessToken = await this.generateJWT(payload);
-
     return { email: user.email, username: user.username, accessToken };
   }
 
@@ -95,5 +119,13 @@ export class AuthProvider {
    */
   private async generateJWT(payload: JWTPayloadType): Promise<string> {
     return await this.jwtService.signAsync(payload);
+  }
+
+  /**
+   * Generate email verification link
+   * @returns the Link
+   */
+  private generateLink(userId: number, verificationToken: string | null) {
+    return `${this.config.get<string>('DOMAIN')}/api/users/verify-email/${userId}/${verificationToken}`;
   }
 }

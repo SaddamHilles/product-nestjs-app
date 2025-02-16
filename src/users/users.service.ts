@@ -5,16 +5,16 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { unlinkSync } from 'node:fs';
+import { join } from 'node:path';
 import { UserType } from 'src/utils/enums';
-import { AccessTokenType, JWTPayloadType } from 'src/utils/types';
+import { JWTPayloadType } from 'src/utils/types';
 import { Repository } from 'typeorm';
 import { AuthProvider } from './auth.provider';
 import { LoginDto } from './dtos/login.dto';
 import { RegisterDto } from './dtos/register.dto';
 import { UpdateUserDto } from './dtos/update-user.dto';
 import { User } from './user.entity';
-import { join } from 'node:path';
-import { unlinkSync } from 'node:fs';
 
 @Injectable()
 export class UsersService {
@@ -28,7 +28,7 @@ export class UsersService {
    * @param registerDto data for creating new user
    * @returns JWT (access token)
    */
-  public async register(registerDto: RegisterDto): Promise<AccessTokenType> {
+  public async register(registerDto: RegisterDto) {
     return this.authProvider.register(registerDto);
   }
 
@@ -37,7 +37,7 @@ export class UsersService {
    * @param loginDto  data for login to user account
    * @returns JWT (access token)
    */
-  public async login(loginDto: LoginDto): Promise<AccessTokenType> {
+  public async login(loginDto: LoginDto) {
     return this.authProvider.login(loginDto);
   }
 
@@ -137,5 +137,29 @@ export class UsersService {
     unlinkSync(imagePath);
     user.profileImage = null;
     return this.usersRepository.save(user);
+  }
+
+  /**
+   * Verify Email
+   * @param userId if of the user from the link
+   * @param verificationToken verification token from the link
+   * @returns success message
+   */
+  public async verifyEmail(userId: number, verificationToken: string) {
+    const user = await this.getCurrentUser(userId);
+    if (!user.verificationToken) {
+      throw new NotFoundException('There is no verification token.');
+    }
+
+    if (user.verificationToken !== verificationToken) {
+      throw new BadRequestException('Invalid link');
+    }
+
+    user.isAccountVerified = true;
+    user.verificationToken = null;
+    await this.usersRepository.save(user);
+    return {
+      message: 'Your email has been verified, please log in to your account',
+    };
   }
 }

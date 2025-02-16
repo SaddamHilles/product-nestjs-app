@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -9,12 +10,13 @@ import {
   ParseIntPipe,
   Post,
   Put,
+  Res,
+  UploadedFile,
   UseGuards,
   UseInterceptors,
-  UploadedFile,
-  BadRequestException,
-  Res,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { Response } from 'express';
 import { UserType } from 'src/utils/enums';
 import { JWTPayloadType } from 'src/utils/types';
 import { CurrentUser } from './decorators/current-user.decorator';
@@ -25,9 +27,6 @@ import { UpdateUserDto } from './dtos/update-user.dto';
 import { AuthRoleGuard } from './guards/auth-roles.guard';
 import { AuthGuard } from './guards/auth.guard';
 import { UsersService } from './users.service';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { Express, Response } from 'express';
 
 @Controller('api')
 export class UsersController {
@@ -82,26 +81,7 @@ export class UsersController {
 
   @Post('user/upload-profile')
   @UseGuards(AuthGuard)
-  @UseInterceptors(
-    FileInterceptor('user-image', {
-      storage: diskStorage({
-        destination: './images/users',
-        filename: (req, file, cb) => {
-          const prefix = `${Date.now()}-${Math.round(Math.random() * 1000000)}`;
-          const filename = `${prefix}-${file.originalname}`;
-          cb(null, filename);
-        },
-      }),
-      fileFilter: (req, file, cb) => {
-        if (file.mimetype.startsWith('image')) {
-          cb(null, true);
-        } else {
-          cb(new BadRequestException('Unsupported file format'), false);
-        }
-      },
-      limits: { fileSize: 1024 * 1024 * 2 },
-    }),
-  )
+  @UseInterceptors(FileInterceptor('user-image'))
   public uploadProfileImage(
     @UploadedFile() file: Express.Multer.File,
     @CurrentUser() payload: JWTPayloadType,
@@ -120,5 +100,13 @@ export class UsersController {
   @UseGuards(AuthGuard)
   public removeProfileImage(@CurrentUser() payload: JWTPayloadType) {
     return this.usersService.removeProfileImage(payload.id);
+  }
+
+  @Get('users/verify-email/:id/:verificationToken')
+  public verifyEmail(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('verificationToken') verificationToken: string,
+  ) {
+    return this.usersService.verifyEmail(id, verificationToken);
   }
 }

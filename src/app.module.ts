@@ -1,3 +1,4 @@
+import { MailModule } from './mail/mail.module';
 import { ClassSerializerInterceptor, Module } from '@nestjs/common';
 import { UsersModule } from './users/users.module';
 import { ProductsModule } from './products/products.module';
@@ -16,6 +17,7 @@ import { UploadModule } from './uploads/uploads.module';
     UsersModule,
     ProductsModule,
     UploadModule,
+    MailModule,
     TypeOrmModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
