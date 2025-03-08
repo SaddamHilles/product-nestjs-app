@@ -25,6 +25,7 @@ import {
   ApiResponse,
   ApiSecurity,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 
 @Controller('/api/products')
 @ApiTags('Products Group')
@@ -64,6 +65,8 @@ export class ProductsController {
   }
 
   @Get(':id')
+  // @SkipThrottle()
+  @Throttle({ default: { limit: 5, ttl: 10000 } }) // Overwrite the main throttle settings in the app module file
   public getProductById(@Param('id', ParseIntPipe) id: number) {
     return this.productsService.getOneBy(id);
   }

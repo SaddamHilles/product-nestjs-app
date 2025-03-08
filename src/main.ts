@@ -3,6 +3,7 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { PayloadTooLargeExceptionFilter } from './uploads/custom-exception-filter';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import helmet from 'helmet';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -11,10 +12,15 @@ async function bootstrap() {
   );
   app.useGlobalFilters(new PayloadTooLargeExceptionFilter());
 
+  // Apply Middlewares
+  app.use(helmet());
+
+  // Cors policy
   app.enableCors({
     origin: 'http://localhost:3000',
   });
 
+  // Swagger config
   const swagger = new DocumentBuilder()
     .setTitle('Nest JS Products - App API')
     .setDescription('Your API desciption')
